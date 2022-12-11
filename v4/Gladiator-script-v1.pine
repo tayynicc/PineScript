@@ -1,0 +1,390 @@
+// @version=4
+// copyright Tayynicc 
+
+study(title="⚔️ Gladiator ⚔️", overlay = true, max_bars_back = 1100)
+
+//  ************** Candle Color Control *****************
+bullCandle = close > open
+
+plotcandle(bullCandle ? open : na, bullCandle ? high : na, bullCandle ? low : na, bullCandle ? close : na, color = color.rgb(115, 185, 241) , bordercolor = color.rgb(115, 185, 241), wickcolor = color.rgb(115, 185, 241))
+plotcandle(bullCandle ? na : open, bullCandle ? na : high, bullCandle ? na : low, bullCandle ? na : close, color = color.rgb(156, 33, 204), bordercolor = color.rgb(156, 33, 204), wickcolor = color.rgb(156, 33, 204))
+
+//  ************** End Color Control *****************
+
+
+prd = input(defval = 3, title="Loopback Period", minval = 2, maxval = 50)
+conslen = input(defval = 7, title="Min Consolidation Length", minval = 2, maxval = 20)
+paintcons = input(defval = true, title = "Paint Consolidation Area ")
+zonecol = input(defval = color.new(color.lime, 70), title = "Zone Color")
+
+
+float hb_ = highestbars(prd) == 0 ? high : na
+float lb_ = lowestbars(prd) == 0 ? low : na
+
+
+var int dir = 0
+float zz = na
+float pp = na
+
+dir := iff(hb_ and na(lb_), 1, iff(lb_ and na(hb_), -1, dir))
+if hb_ and lb_
+    if dir == 1
+        zz := hb_
+    else
+        zz := lb_
+else
+    zz := iff(hb_, hb_, iff(lb_, lb_, na))
+
+for x = 0 to 1000
+    if na(close) or dir != dir[x]
+        break
+    if zz[x]
+        if na(pp)
+            pp := zz[x]
+        else
+            if dir[x] == 1 and zz[x] > pp
+                pp := zz[x]
+            if dir[x] == -1 and zz[x] < pp
+                pp := zz[x]
+
+var int conscnt = 0
+var float condhigh = na
+var float condlow = na
+float H_ = highest(conslen)
+float L_ = lowest(conslen)
+var line upline = na
+var line dnline = na
+bool breakoutup = false
+bool breakoutdown = false
+
+var int startUpLine = na
+
+if change(pp)
+    if conscnt > conslen
+        if pp > condhigh
+            breakoutup := true
+        if pp < condlow
+            breakoutdown := true
+    if conscnt > 0 and pp <= condhigh and pp >= condlow
+        conscnt := conscnt + 1
+    else
+        conscnt := 0
+else
+    conscnt := conscnt + 1
+
+if conscnt >= conslen
+    if conscnt == conslen
+        condhigh := H_
+        condlow  := L_
+    else
+        line.delete(upline)
+        line.delete(dnline)
+        condhigh := max(condhigh, high)
+        condlow := min(condlow, low)
+
+
+
+alertcondition(breakoutup, title='Breakout Up', message='Breakout Up')
+alertcondition(breakoutdown, title='Breakout Down', message='Breakout Down')
+
+
+l1 = low[1]
+l2 = low[2]
+l3 = low[3]
+l4 = low[4]
+l5 = low[5]
+l6 = low[6]
+l = low
+
+vc =  l4 < l1 and l4 < l2 and l4 < l3 and l4 < l6 and l4 < l and  l5 < l1 and l5 < l2 and l5 < l3 and l5 < l6 and l5 < l 
+
+if vc
+    hh = l3
+    hh
+plotshape(vc[4], style=shape.cross, location=location.belowbar, color=color.white, text='X')
+
+
+length = input(title="ATR Period", type=input.integer, defval=100)
+mult = input(title="ATR Multiplier", type=input.float, step=0.1, defval=0.1)
+showLabels = input(title="Show Buy/Sell Labels ?", type=input.bool, defval=false)
+useClose = input(title="Use Close Price for Extremums ?", type=input.bool, defval=true)
+highlightState = input(title="Highlight State ?", type=input.bool, defval=true)
+
+atr = mult * atr(length)
+
+longStop = (useClose ? highest(close, length) : highest(length)) - atr
+longStopPrev = nz(longStop[1], longStop) 
+longStop := close[1] > longStopPrev ? max(longStop, longStopPrev) : longStop
+
+shortStop = (useClose ? lowest(close, length) : lowest(length)) + atr
+shortStopPrev = nz(shortStop[1], shortStop)
+shortStop := close[1] < shortStopPrev ? min(shortStop, shortStopPrev) : shortStop
+
+var int dir_ = 1
+dir_ := close > shortStopPrev ? 1 : close < longStopPrev ? -1 : dir_
+
+
+
+
+// determines buy signal
+buySignal = dir_ == 1 and dir_[1] == -1
+plotchar(buySignal ? longStop : na, char='⚔️', location=location.belowbar, size=size.small)
+
+// sell signal - unused 
+shortStopPlot = plot(dir_ == 1 ? na : shortStop, title="Short Stop", style=plot.style_linebr, linewidth=2, color=na)
+sellSignal = dir_ == -1 and dir_[1] == 1
+
+
+
+
+
+changeCond = dir_ != dir_[1]
+alertcondition(changeCond, title="Alert: CE Direction Change", message="Chandelier Exit has changed direction!")
+alertcondition(buySignal, title="Alert: CE Buy", message="Chandelier Exit Buy!")
+alertcondition(sellSignal, title="Alert: CE Sell", message="Chandelier Exit Sell!")
+
+
+
+MWC = 'Mark whole candle'
+MBC = 'MARK body candle'
+
+i_left              = input(3, 'Left', minval=1, group='candle settings')
+i_right             = input(3, 'Right', minval=1, group='candle settings')
+i_wickPercentage    = input(25, 'Candle wick percentage', minval=1, maxval=100, group='candle settings')
+
+
+i_boxCount          = input(2, 'Box count', minval=1, group='box settings')
+i_markOption        = input(MBC, 'Type of candle marking', options=[MWC, MBC], group='box settings')
+i_extendBoxes       = input(false, 'Extend only untouched by PA')
+i_boxColor          = input(color.orange, 'Box color', type=input.color, group='box settings')
+
+boxColor            = color.new(i_boxColor, 70)
+
+var boxArray = array.new_box()
+
+
+f_isUpCandle(_index) => 
+    open[_index] <= close[_index]
+    
+    
+f_isDP() =>
+    bool isDP = true
+    int endIndex = i_left + i_right
+    potencialDPisUpCandle = f_isUpCandle(i_right) 
+    acceptedPotencialDPCandleWickRatio = abs(open[i_right] - close[i_right])/ abs(high[i_right] - low[i_right]) <= i_wickPercentage/100 
+    
+    if (acceptedPotencialDPCandleWickRatio)
+        for i = endIndex to 0 
+            if (i != i_right and isDP and potencialDPisUpCandle == f_isUpCandle(i) )
+                isDP := false
+    else
+        isDP := false
+    isDP
+    
+// f_ denotes function 
+f_extendArray(_boxArray) =>
+    if (array.size(_boxArray)>0)
+        for i = array.size(_boxArray) - 1  to 0
+            boxToExtend = array.get(_boxArray, i)
+            
+            bottom = box.get_bottom(boxToExtend)
+            top =  box.get_top(boxToExtend)
+            right = box.get_right(boxToExtend)
+            if (not i_extendBoxes or (bar_index - 1 == right and not ((high > bottom and low  < bottom) or (high > top and low  < top))))
+                box.set_right(array.get(_boxArray, i), bar_index)
+    
+    
+isDP = f_isDP()    
+    
+if (isDP)
+    top = i_markOption == MWC? high[i_right]: close[i_right]
+    bottom = i_markOption == MWC? low[i_right]: open[i_right]
+    dpBox = box.new(bar_index[i_right], top, bar_index, bottom, bgcolor=boxColor, border_style=line.style_dashed, border_color= boxColor)
+    if (array.size(boxArray) >= i_boxCount)
+        box.delete(array.shift(boxArray))
+    array.push(boxArray, dpBox)
+    
+f_extendArray(boxArray)
+
+len1 = input(8, minval=1, title="Length top sma")
+src1 = input(close, title="Source")
+smma1 = 0.0
+smma1 := na(smma1[1]) ? sma(src1, len1) : (smma1[1] * (len1 - 1) + src1) / len1
+plot(smma1, color=color.red)
+
+len2 = input(15, minval=1, title="Length mid sma")
+src2 = input(close, title="Source")
+smma2 = 0.0
+smma2 := na(smma2[1]) ? sma(src2, len2) : (smma2[1] * (len2 - 1) + src2) / len2
+plot(smma2, color=color.rgb(88, 172, 241))
+
+len3 = input(48, minval=1, title="Length bottom sma")
+src3 = input(close, title="Source")
+smma3 = 0.0
+smma3 := na(smma3[1]) ? sma(src3, len3) : (smma3[1] * (len3 - 1) + src3) / len3
+plot(smma3, color=color.green)
+
+
+//  ************** Start Banner 1 *****************
+
+// ————— Constants
+color  WHITE = color.new(color.white, 0)
+// color  BLUE  = color.new(color.white, 0)
+string ST_1  = " ⚔️ Market Maker Slayers ⚔️ "
+string ST_2  = "I 💚 TA"
+
+// ————— Inputs
+string GRP1             = "═════════  Text Input  ══════════"
+string textInput1       = input(ST_1, "Text 1", type=input.string, group = GRP1) 
+string textInput2       = input(ST_2, "Text 2", type=input.string, group = GRP1, tooltip = "Clear 'Text 2' to prevent animation.")
+
+string GRP2             = "════════ Information Box ═════════"
+string infoBoxSizeInput = input("normal",  "Size", type=input.string, inline = "21", group = GRP2, options = ["tiny", "small", "normal", "large", "huge", "auto"])
+string infoBoxYPosInput = input("bottom", "↕", type=input.string, inline = "21", group = GRP2, options = ["top", "middle", "bottom"])
+string infoBoxXPosInput = input("right",   "↔", type=input.string, inline = "21", group = GRP2, options = ["left", "center", "right"])
+int    heightInput      = input(7, "Height", type=input.integer, inline = "22", minval = 1, maxval = 100, tooltip = "1-100")
+int    widthInput       = input(13, "Width", type=input.integer, inline = "22", minval = 1, maxval = 100, tooltip = "1-100")
+color  textColorInput   = input(WHITE, "Text", type=input.color)
+// color  bgColorInput     = input(BLUE, "Background", type=input.color)
+// }
+
+
+
+// ———————————————————— Visuals {
+
+
+// We use `var` to only initialize the table on the first bar.
+var table watermark = table.new(infoBoxYPosInput + "_" + infoBoxXPosInput, 1, 1)
+
+// We only populate the table on the last bar; it's more efficient.
+if barstate.islast
+    // This `varip` variable will preserve its value across realtime updates.
+    varip bool changeText = true
+    // Toggle this value on each update.
+    changeText := not changeText
+    // If there's a "Text 2" string in inputs and it's time to flip, change the text.
+    string txt = str.length(textInput2) != 0 and changeText ? textInput2 : textInput1
+    // Populate our table cell.
+    table.cell(watermark, 0, 0, txt, widthInput, heightInput, textColorInput, text_size = infoBoxSizeInput, text_halign = text.align_center, text_valign = text.align_center )
+// }
+
+
+//  ************** End Banner 1 *****************
+
+
+//  ************** Start Banner 2 *****************
+
+// prefix BNR2_ stands for banner 2 
+
+// // ————— Constants
+color  text_color = color.new(color.white, 0)
+color  BNR2_bg_color_red = color.new(color.red, 50)
+color  BNR2_bg_color_blue = color.new(color.rgb(88, 172, 241), 50)
+color  BNR2_bg_color_green = color.new(color.green, 50)
+
+// color  BLUE  = color.new(color.white, 0)
+string STR_1  = " Red SMA - 5MIN POC  "
+string STR_2  = " Blue SMA - 4HR POC "
+string STR_3  = " Green SMA - DAILY POC "
+
+// ————— Inputs
+string BNR2_GRP1             = "═════════  Text Input  ══════════"
+string BNR2_textInput1       = input(STR_1, "Text 1", type=input.string, group = BNR2_GRP1) 
+string BNR2_textInput2       = input(STR_2, "Text 2", type=input.string, group = BNR2_GRP1, tooltip = "Clear 'Text 2 and Text 3' to prevent animation.")
+string BNR2_textInput3       = input(STR_3, "Text 3", type=input.string, group = BNR2_GRP1 )
+
+
+string BNR2_GRP2             = "════════ Information Box ═════════"
+string BNR2_infoBoxSizeInput = input("normal",  "Size", type=input.string, inline = "21", group = BNR2_GRP2, options = ["tiny", "small", "normal", "large", "huge", "auto"])
+string BNR2_infoBoxYPosInput = input("top", "↕", type=input.string, inline = "21", group = BNR2_GRP2, options = ["top", "middle", "bottom"])
+string BNR2_infoBoxXPosInput = input("right",   "↔", type=input.string, inline = "21", group = BNR2_GRP2, options = ["left", "center", "right", "little right"])
+int    BNR2_heightInput      = input(5, "Height", type=input.integer, inline = "22", minval = 1, maxval = 100, tooltip = "1-100")
+int    BNR2_widthInput       = input(13, "Width", type=input.integer, inline = "22", minval = 1, maxval = 100, tooltip = "1-100")
+color  BNR2_textColorInput   = input(text_color, "Text", type=input.color)
+color  BNR2_bgcolor_1          = input(BNR2_bg_color_red,"background", type=input.color )
+color  BNR2_bgcolor_2          = input(BNR2_bg_color_blue,"background", type=input.color )
+color  BNR2_bgcolor_3          = input(BNR2_bg_color_green,"background", type=input.color )
+
+// }
+
+
+
+// ———————————————————— Visuals {
+
+
+// We use `var` to only initialize the table on the first bar.
+var table BNR2_watermark = table.new(BNR2_infoBoxYPosInput + "_" + BNR2_infoBoxXPosInput, 1, 1)
+
+// use an incrementor to show which text cycle we are in 
+
+// We only populate the table on the last bar; it's more efficient.
+if barstate.islast
+  // This `varip` variable will preserve its value across realtime updates.
+    varip bool toggleText = true
+    varip int changeText = 0
+    // Toggle this value on each update.
+    toggleText := not toggleText and changeText + 1
+    
+    // Toggle this value on each update.
+
+    string txt = na
+    color BNR2_bgcolor = na
+    
+    // If there's a "Text 2" string in inputs and it's time to flip, change the text.
+    if changeText == 0
+        // txt  := str.length(BNR2_textInput2) and changeText == 0 and toggleText ? BNR2_textInput1  : BNR2_textInput2
+        txt := BNR2_textInput1
+        BNR2_bgcolor :=  BNR2_bgcolor_1
+
+        // table.cell(BNR2_watermark, 0, 0, txt, BNR2_widthInput, BNR2_heightInput, BNR2_textColorInput, text_size = BNR2_infoBoxSizeInput, bgcolor = BNR2_bgcolor, text_halign = text.align_center, text_valign = text.align_center )
+        // changeText := 1
+
+    if changeText == 1
+        // txt := str.length(BNR2_textInput2) != 0 and toggleText ? BNR2_textInput2  : BNR2_textInput1
+        txt := BNR2_textInput2
+        BNR2_bgcolor :=  BNR2_bgcolor_2
+    
+        // table.cell(BNR2_watermark, 0, 0, txt, BNR2_widthInput, BNR2_heightInput, BNR2_textColorInput, text_size = BNR2_infoBoxSizeInput, bgcolor = BNR2_bgcolor, text_halign = text.align_center, text_valign = text.align_center )
+        // changeText := 2
+
+    // if changeText == 2 
+    //     txt := str.length(BNR2_textInput3) != 0 and toggleText ? BNR2_textInput3  : BNR2_textInput2
+    //     BNR2_bgcolor :=  BNR2_bgcolor_3
+   
+    //     // table.cell(BNR2_watermark, 0, 0, txt, BNR2_widthInput, BNR2_heightInput, BNR2_textColorInput, text_size = BNR2_infoBoxSizeInput, bgcolor = BNR2_bgcolor, text_halign = text.align_center, text_valign = text.align_center )
+    //     changeText := 1
+
+    // Populate our table cell.
+    table.cell(BNR2_watermark, 0, 0, txt, BNR2_widthInput, BNR2_heightInput, BNR2_textColorInput, text_size = BNR2_infoBoxSizeInput, bgcolor = BNR2_bgcolor, text_halign = text.align_center, text_valign = text.align_center )
+
+//     // // This `varip` variable will preserve its value across realtime updates.
+//     // varip bool changeText = true
+//     // varip int changeTextCount = 1
+//     // varip string txt = ''
+//     // // Toggle this value on each update.
+    
+//     // changeText := not changeText and changeTextCount + 1
+//     // // If there's a "Text 2" string in inputs and it's time to flip, change the text.
+//     // if changeTextCount == 1
+//     //     txt := str.length(BNR2_textInput1) != 0 and changeText ? BNR2_textInput1 : BNR2_textInput2
+//     //     changeTextCount := changeTextCount + 1
+
+//     // if changeTextCount == 2 
+//     //     txt := str.length(BNR2_textInput2) != 0 and changeText ? BNR2_textInput2 : BNR2_textInput1
+//     //     changeTextCount := changeTextCount + 1
+    
+
+//     // if changeTextCount == 3 
+//     //     txt := str.length(BNR2_textInput3) != 0 and changeText ? BNR2_textInput3 : BNR2_textInput2
+//     //     changeTextCount := changeTextCount + 1
+    
+    
+
+//     // // string txt = str.length(BNR2_textInput2) != 0 and changeText ? BNR2_textInput3 : BNR2_textInput2
+
+//     // // Populate our table cell.
+//     // table.cell(BNR2_watermark, 0, 0, txt, widthInput, heightInput, textColorInput, text_size = infoBoxSizeInput, text_halign = text.align_center, text_valign = text.align_center)
+// // }
+
+//  ************** end Banner 2 *****************
+
